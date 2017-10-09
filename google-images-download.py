@@ -3,9 +3,9 @@ import os
 import urllib
 import urllib.request
 
-words_to_search = ['rice', 'potato', 'beans', 'steak', 'pork']
+words_to_search = ['arroz', 'batata frita', 'feijão', 'bife', 'frango', 'sopa']
 
-keywords = [' ', 'dish', 'plate', 'recipe']
+keywords = [' ', 'prato', 'receita', 'foto', 'comida']
 
 
 def format_spaces_to_urls(str):
@@ -43,18 +43,20 @@ def download_image(image_url):
 
     return data
 
+
 def _images_get_next_item(s):
     start_line = s.find('rg_di')
-    if start_line == -1:    #If no links are found then give an error!
+    if start_line == -1:  # If no links are found then give an error!
         end_quote = 0
         link = None
         return link, end_quote
     else:
         start_line = s.find('"class="rg_meta"')
-        start_content = s.find('"ou"',start_line+1)
-        end_content = s.find(',"ow"',start_content+1)
-        content_raw = str(s[start_content+6:end_content-1])
+        start_content = s.find('"ou"', start_line + 1)
+        end_content = s.find(',"ow"', start_content + 1)
+        content_raw = str(s[start_content + 6:end_content - 1])
         return content_raw, end_content
+
 
 def parse_google_images_results(googleImageResultsPage):
     page = googleImageResultsPage
@@ -71,7 +73,7 @@ def parse_google_images_results(googleImageResultsPage):
 
 def get_google_image_search(search_str):
     from urllib import parse
-    
+
     url = 'https://www.google.com/search?q=' + parse.quote_plus(search_str) + \
         '&espv=2&biw=1366&bih=667&site=webhp&source=lnms&tbm=isch&sa=X&ei=XosDVaCXD8TasATItgE&ved=0CAcQ_AUoAg'
     page_raw_html = download_page_raw_html(url)
@@ -84,10 +86,22 @@ def write_to_file(path, content):
     output_file.close()
 
 
+def download_images(image_info):
+    try:
+        url, path = image_info
+        print("Downloading " + path)
+        data = download_image(url)
+
+        if data is not None:
+            write_to_file(path, data)
+    except Exception as e:
+        print("Failed to download image \"" + path + "\" Error: " + str(e))
+
 
 begin_time = time.time()  # start the timer
 
 i = 0
+
 while i < len(words_to_search):
     urls = []
 
@@ -130,30 +144,26 @@ while i < len(words_to_search):
         # time.sleep might help here
         pass
 
+    images_infos = []
+
     while(k < len(urls)):
-        try:
-            image_url = urls[k]
-            image_data = download_image(image_url)
+        image_url = urls[k]
+        image_path = word + "/" + str(k + 1)
 
-            if image_data != None:
-                image_path = word + "/" + str(k + 1)
+        if ".png" in image_url:
+            image_path = image_path + ".png"
+        else:
+            image_path = image_path + ".jpg"
 
-                if ".png" in image_url:
-                    image_path = image_path + ".png"
-                else:
-                    image_path = image_path + ".jpg"
+        images_infos.append((image_url, image_path))
 
-                write_to_file(image_path, image_data)
+        k = k + 1
 
-            print("completed ====> " + str(k + 1))
-
-        except IOError:  # If there is any IOError
-
-            errorCount += 1
-            print("IOError on image " + str(k + 1))
-
-        finally:
-            k = k + 1
+    import multiprocessing
+    pool = multiprocessing.Pool(processes=8)
+    pool.map(download_images, images_infos)
+    pool.close()
+    pool.join()
 
     i = i + 1
 
